@@ -21,6 +21,7 @@ enum key_type {
     KEY_ENTER,
     KEY_TAB,
     KEY_ESCAPE,
+    KEY_MOUSE,
 };
 
 enum key_mod {
@@ -30,10 +31,23 @@ enum key_mod {
     MOD_CTRL = 1 << 2,
 };
 
+enum mouse_button {
+    MOUSE_NONE = 0,
+    MOUSE_LEFT_PRESS,
+    MOUSE_LEFT_DRAG,
+    MOUSE_LEFT_RELEASE,
+    MOUSE_SCROLL_UP,
+    MOUSE_SCROLL_DOWN,
+};
+
 typedef struct {
     enum key_type type;
     unsigned int codepoint;
     int mods;
+
+    enum mouse_button mouse_button;
+    int mouse_row;
+    int mouse_col;
 } key_event_t;
 
 void terminal_enable_raw_mode(void);

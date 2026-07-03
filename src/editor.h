@@ -83,4 +83,9 @@ void editor_backspace(editor_t *ed);
 void editor_delete_forward(editor_t *ed);
 void editor_handle_tab(editor_t *ed, bool shift);
 
+void editor_mouse_press(editor_t *ed, int screen_row, int screen_col);
+void editor_mouse_drag(editor_t *ed, int screen_row, int screen_col);
+void editor_mouse_release(editor_t *ed);
+void editor_scroll_view(editor_t *ed, int delta_lines);
+
 #endif /* DAF_EDITOR_H */
