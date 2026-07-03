@@ -1,5 +1,7 @@
 # Daf
 
+[![CI](https://github.com/AnmiTaliDev/daf/actions/workflows/ci.yml/badge.svg)](https://github.com/AnmiTaliDev/daf/actions/workflows/ci.yml)
+
 Daf (Hebrew `דף` — "sheet/page") is a simple console text editor written in C.
 
 ## Planned Features
@@ -16,6 +18,12 @@ ninja -C build
 ```
 
 The binary is produced at `build/src/daf`.
+
+Run the test suite with:
+
+```sh
+meson test -C build
+```
 
 ## Usage
 

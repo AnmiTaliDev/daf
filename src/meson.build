@@ -1,4 +1,4 @@
-daf_sources = files(
+daf_lib_sources = files(
   'common.c',
   'terminal.c',
   'encoding.c',
@@ -8,11 +8,20 @@ daf_sources = files(
   'render.c',
   'input.c',
   'editor.c',
-  'main.c',
+)
+
+daf_inc = include_directories('.')
+
+daf_lib = static_library(
+  'daf_lib',
+  daf_lib_sources,
+  include_directories: daf_inc,
 )
 
 executable(
   'daf',
-  daf_sources,
+  'main.c',
+  include_directories: daf_inc,
+  link_with: daf_lib,
   install: true,
 )
