@@ -4,7 +4,7 @@ Daf (Hebrew `דף` — "sheet/page") is a simple console text editor written in 
 
 ## Planned Features
 
-Mouse support, theming, and similar features are planned for future versions.
+Theming, and similar features are planned for future versions.
 
 ## Building
 
