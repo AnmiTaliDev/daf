@@ -468,3 +468,80 @@ void editor_handle_tab(editor_t *ed, bool shift)
         editor_insert_codepoint(ed, '\t');
     }
 }
+
+static bool editor_screen_to_buffer_pos(const editor_t *ed, int screen_row, int screen_col,
+                                         size_t *out_row, size_t *out_col)
+{
+    if (screen_row < 0 || screen_row >= ed->screen_rows || ed->buf.num_lines == 0) {
+        return false;
+    }
+
+    size_t file_row = ed->rowoff + (size_t)screen_row;
+    if (file_row >= ed->buf.num_lines) {
+        file_row = ed->buf.num_lines - 1;
+    }
+
+    int gutter = editor_gutter_width(ed);
+    int text_col = screen_col - gutter;
+    if (text_col < 0) {
+        text_col = 0;
+    }
+    size_t rx = ed->coloff + (size_t)text_col;
+
+    *out_row = file_row;
+    *out_col = editor_rx_to_cx(&ed->buf.lines[file_row], rx);
+    return true;
+}
+
+void editor_mouse_press(editor_t *ed, int screen_row, int screen_col)
+{
+    size_t row, col;
+    if (!editor_screen_to_buffer_pos(ed, screen_row, screen_col, &row, &col)) {
+        return;
+    }
+    ed->cy = row;
+    ed->cx = col;
+    ed->sel.active = true;
+    ed->sel.anchor_row = row;
+    ed->sel.anchor_col = col;
+    ed->goal_rx = editor_cx_to_rx(&ed->buf.lines[ed->cy], ed->cx);
+}
+
+void editor_mouse_drag(editor_t *ed, int screen_row, int screen_col)
+{
+    size_t row, col;
+    if (!editor_screen_to_buffer_pos(ed, screen_row, screen_col, &row, &col)) {
+        return;
+    }
+    if (!ed->sel.active) {
+        ed->sel.active = true;
+        ed->sel.anchor_row = ed->cy;
+        ed->sel.anchor_col = ed->cx;
+    }
+    ed->cy = row;
+    ed->cx = col;
+    ed->goal_rx = editor_cx_to_rx(&ed->buf.lines[ed->cy], ed->cx);
+}
+
+void editor_mouse_release(editor_t *ed)
+{
+    if (ed->sel.active && ed->sel.anchor_row == ed->cy && ed->sel.anchor_col == ed->cx) {
+        ed->sel.active = false;
+    }
+}
+
+void editor_scroll_view(editor_t *ed, int delta_lines)
+{
+    long max_off = (long)ed->buf.num_lines - (long)DAF_MAX(ed->screen_rows, 1);
+    if (max_off < 0) {
+        max_off = 0;
+    }
+    long new_off = (long)ed->rowoff + delta_lines;
+    if (new_off < 0) {
+        new_off = 0;
+    }
+    if (new_off > max_off) {
+        new_off = max_off;
+    }
+    ed->rowoff = (size_t)new_off;
+}

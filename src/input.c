@@ -177,6 +177,30 @@ void input_process_key(editor_t *ed, key_event_t key)
         return;
     }
 
+    if (key.type == KEY_MOUSE) {
+        switch (key.mouse_button) {
+        case MOUSE_LEFT_PRESS:
+            editor_mouse_press(ed, key.mouse_row, key.mouse_col);
+            break;
+        case MOUSE_LEFT_DRAG:
+            editor_mouse_drag(ed, key.mouse_row, key.mouse_col);
+            break;
+        case MOUSE_LEFT_RELEASE:
+            editor_mouse_release(ed);
+            break;
+        case MOUSE_SCROLL_UP:
+            editor_scroll_view(ed, -3);
+            break;
+        case MOUSE_SCROLL_DOWN:
+            editor_scroll_view(ed, 3);
+            break;
+        case MOUSE_NONE:
+        default:
+            break;
+        }
+        return;
+    }
+
     bool is_ctrl_key = key.type == KEY_CHAR && (key.mods & MOD_CTRL) != 0;
     if (!(is_ctrl_key && key.codepoint == CTRL_KEY('q'))) {
         ed->quit_confirm_pending = false;

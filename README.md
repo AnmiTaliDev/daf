@@ -31,15 +31,15 @@ If no file is given, the editor opens an empty, unnamed buffer.
 |--------------------------------------|--------------------------------------------------|
 | Arrows                               | Move the cursor                                  |
 | Shift + arrows/Home/End/PgUp/PgDn    | Select text                                      |
-| Home                                  | Smart jump to start of line                      |
-| End                                    | Jump to end of line                              |
-| Tab / Shift-Tab                        | Insert tab / indent or dedent the selection      |
-| Ctrl-S                                 | Save (prompts for a name if the file is new)     |
-| Ctrl-Q                                 | Quit (press again to discard unsaved changes)    |
-| Ctrl-F                                 | Find (Enter confirms, Ctrl-F finds next, Esc cancels) |
-| Ctrl-G                                 | Jump to a line number (Enter jumps, Esc cancels) |
-| Backspace / Delete                     | Delete a character or the selection              |
-| Esc                                    | Clear the selection                              |
+| Home                                 | Smart jump to start of line                      |
+| End                                  | Jump to end of line                              |
+| Tab / Shift-Tab                      | Insert tab / indent or dedent the selection      |
+| Ctrl-S                               | Save (prompts for a name if the file is new)     |
+| Ctrl-Q                               | Quit (press again to discard unsaved changes)    |
+| Ctrl-F                               | Find (Enter confirms, Ctrl-F finds next, Esc cancels) |
+| Ctrl-G                               | Jump to a line number (Enter jumps, Esc cancels) |
+| Backspace / Delete                   | Delete a character or the selection              |
+| Esc                                  | Clear the selection                              |
 
 ## License
 
