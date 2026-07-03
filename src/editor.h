@@ -24,6 +24,15 @@ typedef struct {
 } selection_t;
 
 typedef struct {
+    size_t row;
+    size_t col;
+    char *old_text;
+    size_t old_len;
+    char *new_text;
+    size_t new_len;
+} edit_record_t;
+
+typedef struct {
     buffer_t buf;
 
     size_t cy;
@@ -45,6 +54,13 @@ typedef struct {
 
     char status_msg[256];
     const char *filetype;
+
+    edit_record_t *undo_stack;
+    size_t undo_count;
+    size_t undo_cap;
+    edit_record_t *redo_stack;
+    size_t redo_count;
+    size_t redo_cap;
 
     bool quit_confirm_pending;
     bool should_quit;
@@ -87,5 +103,8 @@ void editor_mouse_press(editor_t *ed, int screen_row, int screen_col);
 void editor_mouse_drag(editor_t *ed, int screen_row, int screen_col);
 void editor_mouse_release(editor_t *ed);
 void editor_scroll_view(editor_t *ed, int delta_lines);
+
+void editor_undo(editor_t *ed);
+void editor_redo(editor_t *ed);
 
 #endif /* DAF_EDITOR_H */

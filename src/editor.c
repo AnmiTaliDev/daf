@@ -83,6 +83,86 @@ static size_t first_non_blank(const line_t *line)
     return i;
 }
 
+typedef struct {
+    size_t row;
+    size_t col;
+    char *old_text;
+    size_t old_len;
+} edit_capture_t;
+
+static void free_edit_record(edit_record_t *rec)
+{
+    free(rec->old_text);
+    free(rec->new_text);
+}
+
+static void clear_edit_stack(edit_record_t **stack, size_t *count)
+{
+    for (size_t i = 0; i < *count; i++) {
+        free_edit_record(&(*stack)[i]);
+    }
+    *count = 0;
+}
+
+static void push_edit_record(edit_record_t **stack, size_t *count, size_t *cap, size_t row,
+                              size_t col, const char *old_text, size_t old_len,
+                              const char *new_text, size_t new_len)
+{
+    if (*count == *cap) {
+        size_t new_cap = *cap == 0 ? 16 : *cap * 2;
+        *stack = xrealloc(*stack, new_cap * sizeof(edit_record_t));
+        *cap = new_cap;
+    }
+    edit_record_t *rec = &(*stack)[*count];
+    rec->row = row;
+    rec->col = col;
+    rec->old_text = xmalloc(old_len > 0 ? old_len : 1);
+    memcpy(rec->old_text, old_text, old_len);
+    rec->old_len = old_len;
+    rec->new_text = xmalloc(new_len > 0 ? new_len : 1);
+    memcpy(rec->new_text, new_text, new_len);
+    rec->new_len = new_len;
+    (*count)++;
+}
+
+static void capture_before(editor_t *ed, size_t r1, size_t c1, size_t r2, size_t c2,
+                            edit_capture_t *cap)
+{
+    cap->row = r1;
+    cap->col = c1;
+    cap->old_text = buffer_extract_text(&ed->buf, r1, c1, r2, c2, &cap->old_len);
+}
+
+static void commit_edit(editor_t *ed, edit_capture_t *cap, size_t r2_after, size_t c2_after)
+{
+    size_t new_len;
+    char *new_text = buffer_extract_text(&ed->buf, cap->row, cap->col, r2_after, c2_after, &new_len);
+
+    if (cap->old_len != new_len || memcmp(cap->old_text, new_text, new_len) != 0) {
+        push_edit_record(&ed->undo_stack, &ed->undo_count, &ed->undo_cap, cap->row, cap->col,
+                          cap->old_text, cap->old_len, new_text, new_len);
+        clear_edit_stack(&ed->redo_stack, &ed->redo_count);
+    }
+
+    free(cap->old_text);
+    free(new_text);
+}
+
+static void text_end_position(size_t row, size_t col, const char *text, size_t len,
+                               size_t *out_row, size_t *out_col)
+{
+    for (size_t i = 0; i < len; i++) {
+        if (text[i] == '\n') {
+            row++;
+            col = 0;
+        } else {
+            col++;
+        }
+    }
+    *out_row = row;
+    *out_col = col;
+}
+
 size_t editor_cx_to_rx(const line_t *line, size_t cx)
 {
     size_t rx = 0;
@@ -134,6 +214,10 @@ void editor_init(editor_t *ed, int screen_rows, int screen_cols)
 
 void editor_free(editor_t *ed)
 {
+    clear_edit_stack(&ed->undo_stack, &ed->undo_count);
+    clear_edit_stack(&ed->redo_stack, &ed->redo_count);
+    free(ed->undo_stack);
+    free(ed->redo_stack);
     buffer_free(&ed->buf);
 }
 
@@ -152,6 +236,8 @@ void editor_open(editor_t *ed, const char *filename)
     ed->rowoff = 0;
     ed->coloff = 0;
     ed->sel.active = false;
+    clear_edit_stack(&ed->undo_stack, &ed->undo_count);
+    clear_edit_stack(&ed->redo_stack, &ed->redo_count);
 }
 
 void editor_update_screen_size(editor_t *ed, int screen_rows, int screen_cols)
@@ -353,6 +439,19 @@ void editor_goto_line(editor_t *ed, long line_number)
 
 void editor_insert_codepoint(editor_t *ed, unsigned int codepoint)
 {
+    size_t r1;
+    size_t c1;
+    size_t r2;
+    size_t c2;
+    if (editor_has_selection(ed)) {
+        editor_selection_range(ed, &r1, &c1, &r2, &c2);
+    } else {
+        r1 = r2 = ed->cy;
+        c1 = c2 = ed->cx;
+    }
+    edit_capture_t cap;
+    capture_before(ed, r1, c1, r2, c2, &cap);
+
     if (editor_has_selection(ed)) {
         delete_selection(ed);
     }
@@ -361,10 +460,25 @@ void editor_insert_codepoint(editor_t *ed, unsigned int codepoint)
     buffer_insert_bytes(&ed->buf, ed->cy, ed->cx, bytes, n);
     ed->cx += n;
     ed->goal_rx = editor_cx_to_rx(&ed->buf.lines[ed->cy], ed->cx);
+
+    commit_edit(ed, &cap, ed->cy, ed->cx);
 }
 
 void editor_insert_newline(editor_t *ed)
 {
+    size_t r1;
+    size_t c1;
+    size_t r2;
+    size_t c2;
+    if (editor_has_selection(ed)) {
+        editor_selection_range(ed, &r1, &c1, &r2, &c2);
+    } else {
+        r1 = r2 = ed->cy;
+        c1 = c2 = ed->cx;
+    }
+    edit_capture_t cap;
+    capture_before(ed, r1, c1, r2, c2, &cap);
+
     if (editor_has_selection(ed)) {
         delete_selection(ed);
     }
@@ -372,41 +486,76 @@ void editor_insert_newline(editor_t *ed)
     ed->cy += 1;
     ed->cx = 0;
     ed->goal_rx = 0;
+
+    commit_edit(ed, &cap, ed->cy, ed->cx);
 }
 
 void editor_backspace(editor_t *ed)
 {
+    size_t r1;
+    size_t c1;
+    size_t r2;
+    size_t c2;
     if (editor_has_selection(ed)) {
-        delete_selection(ed);
+        editor_selection_range(ed, &r1, &c1, &r2, &c2);
+    } else if (ed->cx > 0) {
+        r1 = r2 = ed->cy;
+        c1 = prev_char_start(&ed->buf.lines[ed->cy], ed->cx);
+        c2 = ed->cx;
+    } else if (ed->cy > 0) {
+        r1 = ed->cy - 1;
+        c1 = ed->buf.lines[ed->cy - 1].len;
+        r2 = ed->cy;
+        c2 = 0;
+    } else {
         return;
     }
-    if (ed->cx > 0) {
-        line_t *line = &ed->buf.lines[ed->cy];
-        size_t start = prev_char_start(line, ed->cx);
-        buffer_delete_range(&ed->buf, ed->cy, start, ed->cy, ed->cx);
-        ed->cx = start;
-    } else if (ed->cy > 0) {
-        size_t prev_len = ed->buf.lines[ed->cy - 1].len;
-        buffer_join_lines(&ed->buf, ed->cy - 1);
-        ed->cy -= 1;
-        ed->cx = prev_len;
-    }
+
+    edit_capture_t cap;
+    capture_before(ed, r1, c1, r2, c2, &cap);
+
+    buffer_delete_range(&ed->buf, r1, c1, r2, c2);
+    ed->cy = r1;
+    ed->cx = c1;
+    ed->sel.active = false;
     ed->goal_rx = editor_cx_to_rx(&ed->buf.lines[ed->cy], ed->cx);
+
+    commit_edit(ed, &cap, ed->cy, ed->cx);
 }
 
 void editor_delete_forward(editor_t *ed)
 {
+    size_t r1;
+    size_t c1;
+    size_t r2;
+    size_t c2;
     if (editor_has_selection(ed)) {
-        delete_selection(ed);
-        return;
+        editor_selection_range(ed, &r1, &c1, &r2, &c2);
+    } else {
+        line_t *line = &ed->buf.lines[ed->cy];
+        if (ed->cx < line->len) {
+            r1 = r2 = ed->cy;
+            c1 = ed->cx;
+            c2 = next_char_start(line, ed->cx);
+        } else if (ed->cy + 1 < ed->buf.num_lines) {
+            r1 = ed->cy;
+            c1 = line->len;
+            r2 = ed->cy + 1;
+            c2 = 0;
+        } else {
+            return;
+        }
     }
-    line_t *line = &ed->buf.lines[ed->cy];
-    if (ed->cx < line->len) {
-        size_t end = next_char_start(line, ed->cx);
-        buffer_delete_range(&ed->buf, ed->cy, ed->cx, ed->cy, end);
-    } else if (ed->cy + 1 < ed->buf.num_lines) {
-        buffer_join_lines(&ed->buf, ed->cy);
-    }
+
+    edit_capture_t cap;
+    capture_before(ed, r1, c1, r2, c2, &cap);
+
+    buffer_delete_range(&ed->buf, r1, c1, r2, c2);
+    ed->cy = r1;
+    ed->cx = c1;
+    ed->sel.active = false;
+
+    commit_edit(ed, &cap, ed->cy, ed->cx);
 }
 
 static void indent_line(buffer_t *buf, size_t row)
@@ -452,6 +601,10 @@ void editor_handle_tab(editor_t *ed, bool shift)
         editor_selection_range(ed, &r1, &c1, &r2, &c2);
         (void)c1;
         (void)c2;
+
+        edit_capture_t cap;
+        capture_before(ed, r1, 0, r2, ed->buf.lines[r2].len, &cap);
+
         for (size_t row = r1; row <= r2; row++) {
             long delta;
             if (shift) {
@@ -464,6 +617,8 @@ void editor_handle_tab(editor_t *ed, bool shift)
             shift_column_on_row(&ed->cx, ed->cy, row, delta, new_len);
             shift_column_on_row(&ed->sel.anchor_col, ed->sel.anchor_row, row, delta, new_len);
         }
+
+        commit_edit(ed, &cap, r2, ed->buf.lines[r2].len);
     } else if (!shift) {
         editor_insert_codepoint(ed, '\t');
     }
@@ -544,4 +699,52 @@ void editor_scroll_view(editor_t *ed, int delta_lines)
         new_off = max_off;
     }
     ed->rowoff = (size_t)new_off;
+}
+
+void editor_undo(editor_t *ed)
+{
+    if (ed->undo_count == 0) {
+        return;
+    }
+    edit_record_t rec = ed->undo_stack[--ed->undo_count];
+
+    size_t end_row;
+    size_t end_col;
+    text_end_position(rec.row, rec.col, rec.new_text, rec.new_len, &end_row, &end_col);
+    buffer_delete_range(&ed->buf, rec.row, rec.col, end_row, end_col);
+    buffer_insert_text(&ed->buf, rec.row, rec.col, rec.old_text, rec.old_len);
+
+    text_end_position(rec.row, rec.col, rec.old_text, rec.old_len, &end_row, &end_col);
+    ed->cy = end_row;
+    ed->cx = end_col;
+    ed->sel.active = false;
+    ed->goal_rx = editor_cx_to_rx(&ed->buf.lines[ed->cy], ed->cx);
+
+    push_edit_record(&ed->redo_stack, &ed->redo_count, &ed->redo_cap, rec.row, rec.col,
+                      rec.old_text, rec.old_len, rec.new_text, rec.new_len);
+    free_edit_record(&rec);
+}
+
+void editor_redo(editor_t *ed)
+{
+    if (ed->redo_count == 0) {
+        return;
+    }
+    edit_record_t rec = ed->redo_stack[--ed->redo_count];
+
+    size_t end_row;
+    size_t end_col;
+    text_end_position(rec.row, rec.col, rec.old_text, rec.old_len, &end_row, &end_col);
+    buffer_delete_range(&ed->buf, rec.row, rec.col, end_row, end_col);
+    buffer_insert_text(&ed->buf, rec.row, rec.col, rec.new_text, rec.new_len);
+
+    text_end_position(rec.row, rec.col, rec.new_text, rec.new_len, &end_row, &end_col);
+    ed->cy = end_row;
+    ed->cx = end_col;
+    ed->sel.active = false;
+    ed->goal_rx = editor_cx_to_rx(&ed->buf.lines[ed->cy], ed->cx);
+
+    push_edit_record(&ed->undo_stack, &ed->undo_count, &ed->undo_cap, rec.row, rec.col,
+                      rec.old_text, rec.old_len, rec.new_text, rec.new_len);
+    free_edit_record(&rec);
 }

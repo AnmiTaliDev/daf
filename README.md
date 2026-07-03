@@ -46,6 +46,7 @@ If no file is given, the editor opens an empty, unnamed buffer.
 | Ctrl-Q                               | Quit (press again to discard unsaved changes)    |
 | Ctrl-F                               | Find (Enter confirms, Ctrl-F finds next, Esc cancels) |
 | Ctrl-G                               | Jump to a line number (Enter jumps, Esc cancels) |
+| Ctrl-Z / Ctrl-Y                      | Undo / redo                                      |
 | Backspace / Delete                   | Delete a character or the selection              |
 | Esc                                  | Clear the selection                              |
 

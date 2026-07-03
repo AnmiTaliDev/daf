@@ -277,3 +277,60 @@ void buffer_join_lines(buffer_t *buf, size_t row)
     buf->num_lines -= 1;
     buf->dirty = 1;
 }
+
+char *buffer_extract_text(const buffer_t *buf, size_t r1, size_t c1, size_t r2, size_t c2,
+                           size_t *out_len)
+{
+    if (r1 == r2) {
+        const line_t *line = &buf->lines[r1];
+        size_t len = c2 - c1;
+        char *text = xmalloc(len > 0 ? len : 1);
+        memcpy(text, line->chars + c1, len);
+        *out_len = len;
+        return text;
+    }
+
+    size_t total = (buf->lines[r1].len - c1) + 1;
+    for (size_t row = r1 + 1; row < r2; row++) {
+        total += buf->lines[row].len + 1;
+    }
+    total += c2;
+
+    char *text = xmalloc(total > 0 ? total : 1);
+    size_t pos = 0;
+
+    memcpy(text + pos, buf->lines[r1].chars + c1, buf->lines[r1].len - c1);
+    pos += buf->lines[r1].len - c1;
+    text[pos++] = '\n';
+
+    for (size_t row = r1 + 1; row < r2; row++) {
+        memcpy(text + pos, buf->lines[row].chars, buf->lines[row].len);
+        pos += buf->lines[row].len;
+        text[pos++] = '\n';
+    }
+
+    memcpy(text + pos, buf->lines[r2].chars, c2);
+    pos += c2;
+
+    *out_len = pos;
+    return text;
+}
+
+void buffer_insert_text(buffer_t *buf, size_t row, size_t col, const char *text, size_t len)
+{
+    size_t start = 0;
+    for (size_t i = 0; i < len; i++) {
+        if (text[i] != '\n') {
+            continue;
+        }
+        buffer_insert_bytes(buf, row, col, text + start, i - start);
+        col += i - start;
+        buffer_split_line(buf, row, col);
+        row += 1;
+        col = 0;
+        start = i + 1;
+    }
+    if (start < len) {
+        buffer_insert_bytes(buf, row, col, text + start, len - start);
+    }
+}

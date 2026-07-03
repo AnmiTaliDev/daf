@@ -215,6 +215,10 @@ void input_process_key(editor_t *ed, key_event_t key)
             enter_find_mode(ed);
         } else if (key.codepoint == CTRL_KEY('g')) {
             enter_goto_mode(ed);
+        } else if (key.codepoint == CTRL_KEY('z')) {
+            editor_undo(ed);
+        } else if (key.codepoint == CTRL_KEY('y')) {
+            editor_redo(ed);
         }
         return;
     }
