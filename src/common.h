@@ -7,7 +7,7 @@
 
 #include <stddef.h>
 
-#define DAF_VERSION "0.1.0"
+#define DAF_VERSION "0.2.0"
 #define DAF_TAB_STOP 8
 
 #define DAF_MIN(a, b) ((a) < (b) ? (a) : (b))
