@@ -14,9 +14,15 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include "common.h"
+
 static struct termios g_orig_termios;
 static int g_raw_mode_active = 0;
 static volatile sig_atomic_t g_resized = 0;
+
+static char *g_paste_buf = NULL;
+static size_t g_paste_len = 0;
+static size_t g_paste_cap = 0;
 
 static void handle_sigwinch(int signum)
 {
@@ -33,7 +39,7 @@ static void write_str(const char *s)
 void terminal_disable_raw_mode(void)
 {
     if (g_raw_mode_active) {
-        write_str("\x1b[?1006l\x1b[?1002l");
+        write_str("\x1b[?2004l\x1b[?1006l\x1b[?1002l");
         tcsetattr(STDIN_FILENO, TCSAFLUSH, &g_orig_termios);
         g_raw_mode_active = 0;
     }
@@ -60,7 +66,7 @@ void terminal_enable_raw_mode(void)
         exit(EXIT_FAILURE);
     }
     g_raw_mode_active = 1;
-    write_str("\x1b[?1002h\x1b[?1006h");
+    write_str("\x1b[?1002h\x1b[?1006h\x1b[?2004h");
 
     struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
@@ -250,6 +256,51 @@ static key_event_t read_sgr_mouse_sequence(void)
     return ev;
 }
 
+static void paste_buf_append(char c)
+{
+    if (g_paste_len + 1 > g_paste_cap) {
+        size_t new_cap = g_paste_cap == 0 ? 1024 : g_paste_cap * 2;
+        g_paste_buf = xrealloc(g_paste_buf, new_cap);
+        g_paste_cap = new_cap;
+    }
+    g_paste_buf[g_paste_len++] = c;
+}
+
+static key_event_t read_bracketed_paste(void)
+{
+    static const char terminator[5] = {'[', '2', '0', '1', '~'};
+    g_paste_len = 0;
+
+    for (;;) {
+        char c;
+        if (read_raw_byte(&c) != 0) {
+            break;
+        }
+        if ((unsigned char)c != 0x1b) {
+            paste_buf_append(c);
+            continue;
+        }
+
+        char seq[5];
+        size_t got = 0;
+        for (; got < sizeof(seq); got++) {
+            if (try_read_byte(&seq[got], 30) != 0) {
+                break;
+            }
+        }
+        if (got == sizeof(seq) && memcmp(seq, terminator, sizeof(terminator)) == 0) {
+            break;
+        }
+
+        paste_buf_append(0x1b);
+        for (size_t i = 0; i < got; i++) {
+            paste_buf_append(seq[i]);
+        }
+    }
+
+    return (key_event_t){.type = KEY_PASTE, .paste_text = g_paste_buf, .paste_len = g_paste_len};
+}
+
 static key_event_t read_csi_rest(char first_byte)
 {
     char body[16];
@@ -268,6 +319,10 @@ static key_event_t read_csi_rest(char first_byte)
         }
     }
     body[idx] = '\0';
+
+    if (strcmp(body, "200~") == 0) {
+        return read_bracketed_paste();
+    }
 
     return decode_csi_body(body);
 }
@@ -351,4 +406,54 @@ key_event_t terminal_read_key(void)
         return (key_event_t){.type = KEY_CHAR, .codepoint = uc};
     }
     return decode_utf8_char(uc);
+}
+
+static const char k_base64_chars[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                                      "abcdefghijklmnopqrstuvwxyz"
+                                      "0123456789+/";
+
+static size_t base64_encode(const unsigned char *data, size_t len, char *out)
+{
+    size_t out_len = 0;
+    size_t i = 0;
+
+    for (; i + 3 <= len; i += 3) {
+        unsigned int n = ((unsigned int)data[i] << 16) | ((unsigned int)data[i + 1] << 8) |
+                          (unsigned int)data[i + 2];
+        out[out_len++] = k_base64_chars[(n >> 18) & 0x3F];
+        out[out_len++] = k_base64_chars[(n >> 12) & 0x3F];
+        out[out_len++] = k_base64_chars[(n >> 6) & 0x3F];
+        out[out_len++] = k_base64_chars[n & 0x3F];
+    }
+
+    size_t rem = len - i;
+    if (rem == 1) {
+        unsigned int n = (unsigned int)data[i] << 16;
+        out[out_len++] = k_base64_chars[(n >> 18) & 0x3F];
+        out[out_len++] = k_base64_chars[(n >> 12) & 0x3F];
+        out[out_len++] = '=';
+        out[out_len++] = '=';
+    } else if (rem == 2) {
+        unsigned int n = ((unsigned int)data[i] << 16) | ((unsigned int)data[i + 1] << 8);
+        out[out_len++] = k_base64_chars[(n >> 18) & 0x3F];
+        out[out_len++] = k_base64_chars[(n >> 12) & 0x3F];
+        out[out_len++] = k_base64_chars[(n >> 6) & 0x3F];
+        out[out_len++] = '=';
+    }
+
+    return out_len;
+}
+
+void terminal_set_clipboard(const char *text, size_t len)
+{
+    size_t cap = ((len + 2) / 3) * 4 + 1;
+    char *encoded = xmalloc(cap);
+    size_t encoded_len = base64_encode((const unsigned char *)text, len, encoded);
+
+    write_str("\x1b]52;c;");
+    ssize_t written = write(STDOUT_FILENO, encoded, encoded_len);
+    (void)written;
+    write_str("\x07");
+
+    free(encoded);
 }

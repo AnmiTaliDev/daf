@@ -218,6 +218,7 @@ void editor_free(editor_t *ed)
     clear_edit_stack(&ed->redo_stack, &ed->redo_count);
     free(ed->undo_stack);
     free(ed->redo_stack);
+    free(ed->clipboard);
     buffer_free(&ed->buf);
 }
 
@@ -747,4 +748,77 @@ void editor_redo(editor_t *ed)
     push_edit_record(&ed->undo_stack, &ed->undo_count, &ed->undo_cap, rec.row, rec.col,
                       rec.old_text, rec.old_len, rec.new_text, rec.new_len);
     free_edit_record(&rec);
+}
+
+void editor_copy(editor_t *ed)
+{
+    if (!editor_has_selection(ed)) {
+        return;
+    }
+    size_t r1, c1, r2, c2;
+    editor_selection_range(ed, &r1, &c1, &r2, &c2);
+
+    free(ed->clipboard);
+    ed->clipboard = buffer_extract_text(&ed->buf, r1, c1, r2, c2, &ed->clipboard_len);
+}
+
+void editor_cut(editor_t *ed)
+{
+    if (!editor_has_selection(ed)) {
+        return;
+    }
+    editor_copy(ed);
+
+    size_t r1, c1, r2, c2;
+    editor_selection_range(ed, &r1, &c1, &r2, &c2);
+
+    edit_capture_t cap;
+    capture_before(ed, r1, c1, r2, c2, &cap);
+
+    buffer_delete_range(&ed->buf, r1, c1, r2, c2);
+    ed->cy = r1;
+    ed->cx = c1;
+    ed->sel.active = false;
+    ed->goal_rx = editor_cx_to_rx(&ed->buf.lines[ed->cy], ed->cx);
+
+    commit_edit(ed, &cap, ed->cy, ed->cx);
+}
+
+static void insert_text_replacing_selection(editor_t *ed, const char *text, size_t len)
+{
+    size_t r1, c1, r2, c2;
+    if (editor_has_selection(ed)) {
+        editor_selection_range(ed, &r1, &c1, &r2, &c2);
+    } else {
+        r1 = r2 = ed->cy;
+        c1 = c2 = ed->cx;
+    }
+
+    edit_capture_t cap;
+    capture_before(ed, r1, c1, r2, c2, &cap);
+
+    if (editor_has_selection(ed)) {
+        delete_selection(ed);
+    }
+    buffer_insert_text(&ed->buf, ed->cy, ed->cx, text, len);
+    text_end_position(ed->cy, ed->cx, text, len, &ed->cy, &ed->cx);
+    ed->goal_rx = editor_cx_to_rx(&ed->buf.lines[ed->cy], ed->cx);
+
+    commit_edit(ed, &cap, ed->cy, ed->cx);
+}
+
+void editor_paste(editor_t *ed)
+{
+    if (ed->clipboard == NULL || ed->clipboard_len == 0) {
+        return;
+    }
+    insert_text_replacing_selection(ed, ed->clipboard, ed->clipboard_len);
+}
+
+void editor_paste_text(editor_t *ed, const char *text, size_t len)
+{
+    if (len == 0) {
+        return;
+    }
+    insert_text_replacing_selection(ed, text, len);
 }

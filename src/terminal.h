@@ -5,6 +5,8 @@
 #ifndef DAF_TERMINAL_H
 #define DAF_TERMINAL_H
 
+#include <stddef.h>
+
 enum key_type {
     KEY_NONE = 0,
     KEY_CHAR,
@@ -22,6 +24,7 @@ enum key_type {
     KEY_TAB,
     KEY_ESCAPE,
     KEY_MOUSE,
+    KEY_PASTE,
 };
 
 enum key_mod {
@@ -48,6 +51,9 @@ typedef struct {
     enum mouse_button mouse_button;
     int mouse_row;
     int mouse_col;
+
+    const char *paste_text;
+    size_t paste_len;
 } key_event_t;
 
 void terminal_enable_raw_mode(void);
@@ -55,5 +61,7 @@ void terminal_disable_raw_mode(void);
 int terminal_get_window_size(int *rows, int *cols);
 int terminal_consume_resize(void);
 key_event_t terminal_read_key(void);
+
+void terminal_set_clipboard(const char *text, size_t len);
 
 #endif /* DAF_TERMINAL_H */
