@@ -62,6 +62,9 @@ typedef struct {
     size_t redo_count;
     size_t redo_cap;
 
+    char *clipboard;
+    size_t clipboard_len;
+
     bool quit_confirm_pending;
     bool should_quit;
 } editor_t;
@@ -106,5 +109,10 @@ void editor_scroll_view(editor_t *ed, int delta_lines);
 
 void editor_undo(editor_t *ed);
 void editor_redo(editor_t *ed);
+
+void editor_copy(editor_t *ed);
+void editor_cut(editor_t *ed);
+void editor_paste(editor_t *ed);
+void editor_paste_text(editor_t *ed, const char *text, size_t len);
 
 #endif /* DAF_EDITOR_H */

@@ -201,6 +201,12 @@ void input_process_key(editor_t *ed, key_event_t key)
         return;
     }
 
+    if (key.type == KEY_PASTE) {
+        editor_paste_text(ed, key.paste_text, key.paste_len);
+        editor_set_status(ed, "Pasted from terminal");
+        return;
+    }
+
     bool is_ctrl_key = key.type == KEY_CHAR && (key.mods & MOD_CTRL) != 0;
     if (!(is_ctrl_key && key.codepoint == CTRL_KEY('q'))) {
         ed->quit_confirm_pending = false;
@@ -219,6 +225,27 @@ void input_process_key(editor_t *ed, key_event_t key)
             editor_undo(ed);
         } else if (key.codepoint == CTRL_KEY('y')) {
             editor_redo(ed);
+        } else if (key.codepoint == CTRL_KEY('c')) {
+            if (editor_has_selection(ed)) {
+                editor_copy(ed);
+                terminal_set_clipboard(ed->clipboard, ed->clipboard_len);
+                editor_set_status(ed, "Copied");
+            } else {
+                editor_set_status(ed, "Nothing selected");
+            }
+        } else if (key.codepoint == CTRL_KEY('x')) {
+            if (editor_has_selection(ed)) {
+                editor_cut(ed);
+                terminal_set_clipboard(ed->clipboard, ed->clipboard_len);
+                editor_set_status(ed, "Cut");
+            } else {
+                editor_set_status(ed, "Nothing selected");
+            }
+        } else if (key.codepoint == CTRL_KEY('v')) {
+            if (ed->clipboard != NULL) {
+                editor_paste(ed);
+                editor_set_status(ed, "Pasted");
+            }
         }
         return;
     }
