@@ -77,18 +77,26 @@ static const char *prompt_label(editor_mode_t mode)
 static void render_gutter(abuf_t *ab, const editor_t *ed, size_t file_row, bool is_current)
 {
     int width = editor_gutter_width(ed);
-    char num[32];
-    int n = snprintf(num, sizeof(num), "%*zu ", width - 1, file_row + 1);
-    if (n < 0) {
-        n = 0;
+    char digits[32];
+    int digit_len = snprintf(digits, sizeof(digits), "%zu", file_row + 1);
+    if (digit_len < 0) {
+        digit_len = 0;
     }
+
+    int pad = width - 1 - digit_len;
+    for (int i = 0; i < pad; i++) {
+        abuf_append(ab, " ", 1);
+    }
+
     if (is_current) {
         abuf_append_str(ab, "\x1b[7m");
     }
-    abuf_append(ab, num, (size_t)n);
+    abuf_append(ab, digits, (size_t)digit_len);
     if (is_current) {
         abuf_append_str(ab, "\x1b[27m");
     }
+
+    abuf_append(ab, " ", 1);
 }
 
 static void render_empty_gutter(abuf_t *ab, const editor_t *ed)
