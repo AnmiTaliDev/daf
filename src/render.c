@@ -100,6 +100,17 @@ static void render_empty_gutter(abuf_t *ab, const editor_t *ed)
     abuf_append_str(ab, "~");
 }
 
+static bool byte_in_search_match(const editor_t *ed, size_t row, size_t byte_col)
+{
+    for (size_t i = 0; i < ed->search_match_count; i++) {
+        const search_match_t *m = &ed->search_matches[i];
+        if (m->row == row && byte_col >= m->col && byte_col < m->col + ed->prompt_len) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void render_text_row(abuf_t *ab, const editor_t *ed, size_t file_row)
 {
     const line_t *line = &ed->buf.lines[file_row];
@@ -118,18 +129,25 @@ static void render_text_row(abuf_t *ab, const editor_t *ed, size_t file_row)
             hl_end = (file_row == r2) ? c2 : line->len;
         }
     }
+    bool show_matches = ed->mode == MODE_PROMPT_FIND && ed->search_match_count > 0;
 
     size_t i = 0;
     size_t rx = 0;
     int emitted = 0;
     bool hl_active = false;
+    bool match_active = false;
 
     while (i < line->len && emitted < text_cols) {
         unsigned char c = (unsigned char)line->chars[i];
         bool should_hl = row_has_hl && i >= hl_start && i < hl_end;
+        bool should_match = show_matches && byte_in_search_match(ed, file_row, i);
         if (should_hl != hl_active) {
             abuf_append_str(ab, should_hl ? "\x1b[7m" : "\x1b[27m");
             hl_active = should_hl;
+        }
+        if (should_match != match_active) {
+            abuf_append_str(ab, should_match ? "\x1b[4m" : "\x1b[24m");
+            match_active = should_match;
         }
 
         if (c == '\t') {
@@ -158,6 +176,9 @@ static void render_text_row(abuf_t *ab, const editor_t *ed, size_t file_row)
 
     if (hl_active) {
         abuf_append_str(ab, "\x1b[27m");
+    }
+    if (match_active) {
+        abuf_append_str(ab, "\x1b[24m");
     }
 }
 
@@ -204,6 +225,13 @@ static void render_message_bar(abuf_t *ab, const editor_t *ed)
     if (ed->mode != MODE_EDIT) {
         abuf_append_str(ab, prompt_label(ed->mode));
         abuf_append(ab, ed->prompt_input, ed->prompt_len);
+        if (ed->mode == MODE_PROMPT_FIND && ed->prompt_len > 0) {
+            char count_buf[32];
+            int n = snprintf(count_buf, sizeof(count_buf), "  (%zu found)", ed->search_match_count);
+            if (n > 0) {
+                abuf_append(ab, count_buf, (size_t)n);
+            }
+        }
     } else {
         size_t len = strlen(ed->status_msg);
         size_t max_len = ed->screen_cols > 0 ? (size_t)ed->screen_cols : 0;

@@ -44,7 +44,7 @@ If no file is given, the editor opens an empty, unnamed buffer.
 | Tab / Shift-Tab                      | Insert tab / indent or dedent the selection      |
 | Ctrl-S                               | Save (prompts for a name if the file is new)     |
 | Ctrl-Q                               | Quit (press again to discard unsaved changes)    |
-| Ctrl-F                               | Find (Enter confirms, Ctrl-F finds next, Esc cancels) |
+| Ctrl-F                               | Find: all matches are highlighted with a count in the prompt; Ctrl-F again jumps to the next match (wraps around), Enter confirms, Esc cancels |
 | Ctrl-G                               | Jump to a line number (Enter jumps, Esc cancels) |
 | Ctrl-Z / Ctrl-Y                      | Undo / redo                                      |
 | Ctrl-C / Ctrl-X                      | Copy / cut the selection (also pushed to the system clipboard) |
