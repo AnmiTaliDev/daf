@@ -77,14 +77,20 @@ static void do_incremental_search(editor_t *ed)
     if (ed->prompt_len == 0) {
         ed->cy = ed->search_start_cy;
         ed->cx = ed->search_start_cx;
+        editor_clear_search_matches(ed);
         return;
     }
+
     size_t row, col;
     if (search_find_forward(&ed->buf, ed->search_start_cy, ed->search_start_cx, ed->prompt_input,
                              &row, &col)) {
         ed->cy = row;
         ed->cx = col;
     }
+
+    size_t count;
+    search_match_t *matches = search_find_all(&ed->buf, ed->prompt_input, &count);
+    editor_set_search_matches(ed, matches, count);
 }
 
 static void confirm_prompt(editor_t *ed)
@@ -92,6 +98,7 @@ static void confirm_prompt(editor_t *ed)
     switch (ed->mode) {
     case MODE_PROMPT_FIND:
         ed->mode = MODE_EDIT;
+        editor_clear_search_matches(ed);
         editor_set_status(ed, "Ln %zu, Col %zu", ed->cy + 1, ed->cx + 1);
         break;
 
@@ -133,6 +140,7 @@ static void process_prompt_key(editor_t *ed, key_event_t key)
         if (ed->mode == MODE_PROMPT_FIND) {
             ed->cy = ed->search_start_cy;
             ed->cx = ed->search_start_cx;
+            editor_clear_search_matches(ed);
         }
         ed->mode = MODE_EDIT;
         editor_set_status(ed, "Cancelled");

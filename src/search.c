@@ -6,6 +6,8 @@
 
 #include <string.h>
 
+#include "common.h"
+
 static long find_substring(const char *hay, size_t hay_len, const char *needle, size_t needle_len,
                             size_t from)
 {
@@ -53,4 +55,37 @@ bool search_find_forward(const buffer_t *buf, size_t start_row, size_t start_col
     }
 
     return false;
+}
+
+search_match_t *search_find_all(const buffer_t *buf, const char *query, size_t *out_count)
+{
+    size_t query_len = strlen(query);
+    search_match_t *matches = NULL;
+    size_t count = 0;
+    size_t cap = 0;
+
+    if (query_len > 0) {
+        for (size_t row = 0; row < buf->num_lines; row++) {
+            const line_t *line = &buf->lines[row];
+            size_t from = 0;
+            for (;;) {
+                long pos = find_substring(line->chars, line->len, query, query_len, from);
+                if (pos < 0) {
+                    break;
+                }
+                if (count == cap) {
+                    size_t new_cap = cap == 0 ? 16 : cap * 2;
+                    matches = xrealloc(matches, new_cap * sizeof(search_match_t));
+                    cap = new_cap;
+                }
+                matches[count].row = row;
+                matches[count].col = (size_t)pos;
+                count++;
+                from = (size_t)pos + query_len;
+            }
+        }
+    }
+
+    *out_count = count;
+    return matches;
 }

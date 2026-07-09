@@ -219,6 +219,7 @@ void editor_free(editor_t *ed)
     free(ed->undo_stack);
     free(ed->redo_stack);
     free(ed->clipboard);
+    free(ed->search_matches);
     buffer_free(&ed->buf);
 }
 
@@ -239,6 +240,7 @@ void editor_open(editor_t *ed, const char *filename)
     ed->sel.active = false;
     clear_edit_stack(&ed->undo_stack, &ed->undo_count);
     clear_edit_stack(&ed->redo_stack, &ed->redo_count);
+    editor_clear_search_matches(ed);
 }
 
 void editor_update_screen_size(editor_t *ed, int screen_rows, int screen_cols)
@@ -321,6 +323,18 @@ void editor_selection_range(const editor_t *ed, size_t *r1, size_t *c1, size_t *
 void editor_clear_selection(editor_t *ed)
 {
     ed->sel.active = false;
+}
+
+void editor_set_search_matches(editor_t *ed, search_match_t *matches, size_t count)
+{
+    free(ed->search_matches);
+    ed->search_matches = matches;
+    ed->search_match_count = count;
+}
+
+void editor_clear_search_matches(editor_t *ed)
+{
+    editor_set_search_matches(ed, NULL, 0);
 }
 
 static void begin_or_extend_selection(editor_t *ed, bool extend)

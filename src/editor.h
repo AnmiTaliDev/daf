@@ -9,6 +9,7 @@
 #include <stddef.h>
 
 #include "buffer.h"
+#include "search.h"
 
 typedef enum {
     MODE_EDIT,
@@ -51,6 +52,8 @@ typedef struct {
     size_t prompt_len;
     size_t search_start_cy;
     size_t search_start_cx;
+    search_match_t *search_matches;
+    size_t search_match_count;
 
     char status_msg[256];
     const char *filetype;
@@ -86,6 +89,9 @@ size_t editor_rx_to_cx(const line_t *line, size_t target_rx);
 bool editor_has_selection(const editor_t *ed);
 void editor_selection_range(const editor_t *ed, size_t *r1, size_t *c1, size_t *r2, size_t *c2);
 void editor_clear_selection(editor_t *ed);
+
+void editor_set_search_matches(editor_t *ed, search_match_t *matches, size_t count);
+void editor_clear_search_matches(editor_t *ed);
 
 void editor_move_left(editor_t *ed, bool extend);
 void editor_move_right(editor_t *ed, bool extend);
