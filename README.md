@@ -46,6 +46,7 @@ If no file is given, the editor opens an empty, unnamed buffer.
 | Ctrl-Q                               | Quit (press again to discard unsaved changes)    |
 | Ctrl-F                               | Find: all matches are highlighted with a count in the prompt; Ctrl-F again jumps to the next match (wraps around), Enter confirms, Esc cancels |
 | Ctrl-G                               | Jump to a line number (Enter jumps, Esc cancels) |
+| Ctrl-R                               | Search & replace: type the search text, Enter, then the replacement text, Enter to replace every match at once (Esc cancels either step) |
 | Ctrl-Z / Ctrl-Y                      | Undo / redo                                      |
 | Ctrl-C / Ctrl-X                      | Copy / cut the selection (also pushed to the system clipboard) |
 | Ctrl-V                               | Paste the internal clipboard                     |
