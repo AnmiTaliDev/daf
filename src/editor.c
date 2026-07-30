@@ -836,3 +836,40 @@ void editor_paste_text(editor_t *ed, const char *text, size_t len)
     }
     insert_text_replacing_selection(ed, text, len);
 }
+
+size_t editor_replace_all(editor_t *ed, const char *query, const char *replacement)
+{
+    size_t count;
+    search_match_t *matches = search_find_all(&ed->buf, query, &count);
+    if (count == 0) {
+        free(matches);
+        return 0;
+    }
+
+    size_t query_len = strlen(query);
+    size_t replacement_len = strlen(replacement);
+
+    size_t last_row = ed->buf.num_lines - 1;
+    size_t last_col = ed->buf.lines[last_row].len;
+
+    edit_capture_t cap;
+    capture_before(ed, 0, 0, last_row, last_col, &cap);
+
+    for (size_t i = count; i > 0; i--) {
+        search_match_t *m = &matches[i - 1];
+        buffer_delete_range(&ed->buf, m->row, m->col, m->row, m->col + query_len);
+        buffer_insert_text(&ed->buf, m->row, m->col, replacement, replacement_len);
+    }
+    free(matches);
+
+    last_row = ed->buf.num_lines - 1;
+    last_col = ed->buf.lines[last_row].len;
+    commit_edit(ed, &cap, last_row, last_col);
+
+    ed->cy = 0;
+    ed->cx = 0;
+    ed->goal_rx = 0;
+    ed->sel.active = false;
+
+    return count;
+}

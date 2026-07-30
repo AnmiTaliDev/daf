@@ -68,10 +68,22 @@ static const char *prompt_label(editor_mode_t mode)
         return "Go to line: ";
     case MODE_PROMPT_SAVE_AS:
         return "Save as: ";
+    case MODE_PROMPT_REPLACE_SEARCH:
+        return "Replace: ";
+    case MODE_PROMPT_REPLACE_WITH:
+        return "With: ";
     case MODE_EDIT:
     default:
         return "";
     }
+}
+
+static size_t active_search_query_len(const editor_t *ed)
+{
+    if (ed->mode == MODE_PROMPT_REPLACE_WITH) {
+        return ed->replace_search_len;
+    }
+    return ed->prompt_len;
 }
 
 static void render_gutter(abuf_t *ab, const editor_t *ed, size_t file_row, bool is_current)
@@ -110,9 +122,10 @@ static void render_empty_gutter(abuf_t *ab, const editor_t *ed)
 
 static bool byte_in_search_match(const editor_t *ed, size_t row, size_t byte_col)
 {
+    size_t query_len = active_search_query_len(ed);
     for (size_t i = 0; i < ed->search_match_count; i++) {
         const search_match_t *m = &ed->search_matches[i];
-        if (m->row == row && byte_col >= m->col && byte_col < m->col + ed->prompt_len) {
+        if (m->row == row && byte_col >= m->col && byte_col < m->col + query_len) {
             return true;
         }
     }
@@ -137,7 +150,9 @@ static void render_text_row(abuf_t *ab, const editor_t *ed, size_t file_row)
             hl_end = (file_row == r2) ? c2 : line->len;
         }
     }
-    bool show_matches = ed->mode == MODE_PROMPT_FIND && ed->search_match_count > 0;
+    bool show_matches = (ed->mode == MODE_PROMPT_FIND || ed->mode == MODE_PROMPT_REPLACE_SEARCH ||
+                          ed->mode == MODE_PROMPT_REPLACE_WITH) &&
+                         ed->search_match_count > 0;
 
     size_t i = 0;
     size_t rx = 0;
@@ -233,7 +248,10 @@ static void render_message_bar(abuf_t *ab, const editor_t *ed)
     if (ed->mode != MODE_EDIT) {
         abuf_append_str(ab, prompt_label(ed->mode));
         abuf_append(ab, ed->prompt_input, ed->prompt_len);
-        if (ed->mode == MODE_PROMPT_FIND && ed->prompt_len > 0) {
+
+        bool has_query = (ed->mode == MODE_PROMPT_FIND || ed->mode == MODE_PROMPT_REPLACE_SEARCH) &&
+                          ed->prompt_len > 0;
+        if (has_query || ed->mode == MODE_PROMPT_REPLACE_WITH) {
             char count_buf[32];
             int n = snprintf(count_buf, sizeof(count_buf), "  (%zu found)", ed->search_match_count);
             if (n > 0) {

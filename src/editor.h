@@ -16,6 +16,8 @@ typedef enum {
     MODE_PROMPT_FIND,
     MODE_PROMPT_GOTO,
     MODE_PROMPT_SAVE_AS,
+    MODE_PROMPT_REPLACE_SEARCH,
+    MODE_PROMPT_REPLACE_WITH,
 } editor_mode_t;
 
 typedef struct {
@@ -54,6 +56,8 @@ typedef struct {
     size_t search_start_cx;
     search_match_t *search_matches;
     size_t search_match_count;
+    char replace_search[256];
+    size_t replace_search_len;
 
     char status_msg[256];
     const char *filetype;
@@ -120,5 +124,7 @@ void editor_copy(editor_t *ed);
 void editor_cut(editor_t *ed);
 void editor_paste(editor_t *ed);
 void editor_paste_text(editor_t *ed, const char *text, size_t len);
+
+size_t editor_replace_all(editor_t *ed, const char *query, const char *replacement);
 
 #endif /* DAF_EDITOR_H */

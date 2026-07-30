@@ -5,6 +5,7 @@
 #include "input.h"
 
 #include <stdlib.h>
+#include <string.h>
 
 #include "filetype.h"
 #include "search.h"
@@ -50,6 +51,20 @@ static void enter_goto_mode(editor_t *ed)
     ed->mode = MODE_PROMPT_GOTO;
     ed->prompt_len = 0;
     ed->prompt_input[0] = '\0';
+}
+
+static void enter_replace_mode(editor_t *ed)
+{
+    ed->mode = MODE_PROMPT_REPLACE_SEARCH;
+    ed->prompt_len = 0;
+    ed->prompt_input[0] = '\0';
+    ed->search_start_cy = ed->cy;
+    ed->search_start_cx = ed->cx;
+}
+
+static bool is_find_like_mode(editor_mode_t mode)
+{
+    return mode == MODE_PROMPT_FIND || mode == MODE_PROMPT_REPLACE_SEARCH;
 }
 
 static void prompt_append_char(editor_t *ed, unsigned int codepoint)
@@ -128,6 +143,28 @@ static void confirm_prompt(editor_t *ed)
         }
         break;
 
+    case MODE_PROMPT_REPLACE_SEARCH:
+        if (ed->prompt_len == 0) {
+            ed->mode = MODE_EDIT;
+            editor_clear_search_matches(ed);
+            editor_set_status(ed, "Cancelled");
+            break;
+        }
+        memcpy(ed->replace_search, ed->prompt_input, ed->prompt_len + 1);
+        ed->replace_search_len = ed->prompt_len;
+        ed->prompt_len = 0;
+        ed->prompt_input[0] = '\0';
+        ed->mode = MODE_PROMPT_REPLACE_WITH;
+        break;
+
+    case MODE_PROMPT_REPLACE_WITH: {
+        size_t count = editor_replace_all(ed, ed->replace_search, ed->prompt_input);
+        ed->mode = MODE_EDIT;
+        editor_clear_search_matches(ed);
+        editor_set_status(ed, "Replaced %zu occurrence(s)", count);
+        break;
+    }
+
     case MODE_EDIT:
     default:
         break;
@@ -137,7 +174,7 @@ static void confirm_prompt(editor_t *ed)
 static void process_prompt_key(editor_t *ed, key_event_t key)
 {
     if (key.type == KEY_ESCAPE) {
-        if (ed->mode == MODE_PROMPT_FIND) {
+        if (is_find_like_mode(ed->mode) || ed->mode == MODE_PROMPT_REPLACE_WITH) {
             ed->cy = ed->search_start_cy;
             ed->cx = ed->search_start_cx;
             editor_clear_search_matches(ed);
@@ -149,7 +186,7 @@ static void process_prompt_key(editor_t *ed, key_event_t key)
 
     if (key.type == KEY_BACKSPACE) {
         prompt_backspace(ed);
-        if (ed->mode == MODE_PROMPT_FIND) {
+        if (is_find_like_mode(ed->mode)) {
             do_incremental_search(ed);
         }
         return;
@@ -172,7 +209,7 @@ static void process_prompt_key(editor_t *ed, key_event_t key)
 
     if (key.type == KEY_CHAR && !(key.mods & MOD_CTRL)) {
         prompt_append_char(ed, key.codepoint);
-        if (ed->mode == MODE_PROMPT_FIND) {
+        if (is_find_like_mode(ed->mode)) {
             do_incremental_search(ed);
         }
     }
@@ -229,6 +266,8 @@ void input_process_key(editor_t *ed, key_event_t key)
             enter_find_mode(ed);
         } else if (key.codepoint == CTRL_KEY('g')) {
             enter_goto_mode(ed);
+        } else if (key.codepoint == CTRL_KEY('r')) {
+            enter_replace_mode(ed);
         } else if (key.codepoint == CTRL_KEY('z')) {
             editor_undo(ed);
         } else if (key.codepoint == CTRL_KEY('y')) {
