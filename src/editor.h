@@ -10,6 +10,7 @@
 
 #include "buffer.h"
 #include "search.h"
+#include "theme.h"
 
 typedef enum {
     MODE_EDIT,
@@ -61,6 +62,7 @@ typedef struct {
 
     char status_msg[256];
     const char *filetype;
+    const theme_t *theme;
 
     edit_record_t *undo_stack;
     size_t undo_count;

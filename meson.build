@@ -11,6 +11,11 @@ project(
 )
 
 add_project_arguments('-D_POSIX_C_SOURCE=200809L', language: 'c')
+add_project_arguments(
+  '-DDAF_DEFAULT_THEME="' + get_option('default_theme') + '"',
+  '-DDAF_CONFIG_SUBPATH="' + get_option('config_subpath') + '"',
+  language: 'c',
+)
 
 subdir('src')
 subdir('tests')

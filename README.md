@@ -4,9 +4,20 @@
 
 Daf (Hebrew `דף` — "sheet/page") is a simple console text editor written in C.
 
-## Planned Features
+## Themes
 
-Theming, and similar features are planned for future versions.
+Three built-in 256-color themes: `dark` (default), `light`, and `mono` (the
+original reverse-video/underline look, for terminals or tastes that don't
+want real colors). Resolved in this order:
+
+1. `--theme=NAME` on the command line
+2. the `DAF_THEME` environment variable
+3. `theme=NAME` in the config file (`$XDG_CONFIG_HOME/daf/config`, or
+   `~/.config/daf/config`) — `#` starts a comment
+4. the build-time default (`meson configure -Ddefault_theme=NAME`)
+
+The config file's own location can be changed at build time too, with
+`meson configure -Dconfig_subpath=...`.
 
 ## Building
 

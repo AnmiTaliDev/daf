@@ -1,4 +1,7 @@
-test_names = ['buffer', 'search', 'encoding', 'filetype', 'editor', 'undo', 'clipboard', 'replace', 'autoindent']
+test_names = [
+  'buffer', 'search', 'encoding', 'filetype', 'editor', 'undo', 'clipboard',
+  'replace', 'autoindent', 'theme', 'config',
+]
 
 foreach name : test_names
   test_exe = executable(

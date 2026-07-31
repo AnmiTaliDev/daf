@@ -209,6 +209,10 @@ void editor_init(editor_t *ed, int screen_rows, int screen_cols)
     ed->screen_cols = screen_cols;
     ed->mode = MODE_EDIT;
     ed->filetype = "Plain Text";
+    ed->theme = theme_find(theme_build_default_name());
+    if (ed->theme == NULL) {
+        ed->theme = theme_find("dark");
+    }
     editor_set_status(ed, "daf %s  |  Ctrl-S save  Ctrl-Q quit  Ctrl-F find  Ctrl-G go to line", DAF_VERSION);
 }
 

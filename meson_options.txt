@@ -1,0 +1,14 @@
+option(
+  'default_theme',
+  type: 'combo',
+  choices: ['dark', 'light', 'mono'],
+  value: 'dark',
+  description: 'Theme used when nothing else (flag, env var, config file) picks one',
+)
+
+option(
+  'config_subpath',
+  type: 'string',
+  value: 'daf/config',
+  description: 'Path to the user config file, relative to $XDG_CONFIG_HOME (or $HOME/.config)',
+)
