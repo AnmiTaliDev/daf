@@ -497,10 +497,24 @@ void editor_insert_newline(editor_t *ed)
     if (editor_has_selection(ed)) {
         delete_selection(ed);
     }
+
+    /* Auto-indent: carry the current line's leading whitespace over to the
+     * new line, unless the cursor is still inside that whitespace (the
+     * split already carries it over correctly in that case). */
+    size_t indent_len = first_non_blank(&ed->buf.lines[ed->cy]);
+    if (ed->cx < indent_len) {
+        indent_len = 0;
+    }
+
     buffer_split_line(&ed->buf, ed->cy, ed->cx);
     ed->cy += 1;
     ed->cx = 0;
-    ed->goal_rx = 0;
+
+    if (indent_len > 0) {
+        buffer_insert_bytes(&ed->buf, ed->cy, 0, ed->buf.lines[ed->cy - 1].chars, indent_len);
+        ed->cx = indent_len;
+    }
+    ed->goal_rx = editor_cx_to_rx(&ed->buf.lines[ed->cy], ed->cx);
 
     commit_edit(ed, &cap, ed->cy, ed->cx);
 }
