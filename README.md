@@ -53,6 +53,9 @@ If no file is given, the editor opens an empty, unnamed buffer.
 | Backspace / Delete                   | Delete a character or the selection              |
 | Esc                                  | Clear the selection                              |
 
+Enter also auto-indents: a new line inherits the current line's leading
+whitespace.
+
 ## License
 
 GNU GPL 3.0.
