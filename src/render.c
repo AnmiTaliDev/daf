@@ -88,6 +88,7 @@ static size_t active_search_query_len(const editor_t *ed)
 
 static void render_gutter(abuf_t *ab, const editor_t *ed, size_t file_row, bool is_current)
 {
+    const theme_t *theme = ed->theme;
     int width = editor_gutter_width(ed);
     char digits[32];
     int digit_len = snprintf(digits, sizeof(digits), "%zu", file_row + 1);
@@ -96,28 +97,38 @@ static void render_gutter(abuf_t *ab, const editor_t *ed, size_t file_row, bool 
     }
 
     int pad = width - 1 - digit_len;
+    abuf_append_str(ab, theme->gutter);
     for (int i = 0; i < pad; i++) {
         abuf_append(ab, " ", 1);
     }
 
     if (is_current) {
-        abuf_append_str(ab, "\x1b[7m");
+        abuf_append_str(ab, theme->reset);
+        abuf_append_str(ab, theme->gutter_current);
     }
     abuf_append(ab, digits, (size_t)digit_len);
     if (is_current) {
-        abuf_append_str(ab, "\x1b[27m");
+        abuf_append_str(ab, theme->reset);
+        abuf_append_str(ab, theme->gutter);
     }
 
     abuf_append(ab, " ", 1);
+    abuf_append_str(ab, theme->reset);
 }
 
 static void render_empty_gutter(abuf_t *ab, const editor_t *ed)
 {
+    const theme_t *theme = ed->theme;
     int width = editor_gutter_width(ed);
+    abuf_append_str(ab, theme->gutter);
     for (int i = 0; i < width; i++) {
         abuf_append(ab, " ", 1);
     }
+    abuf_append_str(ab, theme->reset);
+    abuf_append_str(ab, theme->tilde);
     abuf_append_str(ab, "~");
+    abuf_append_str(ab, theme->reset);
+    abuf_append_str(ab, theme->normal);
 }
 
 static bool byte_in_search_match(const editor_t *ed, size_t row, size_t byte_col)
@@ -132,8 +143,37 @@ static bool byte_in_search_match(const editor_t *ed, size_t row, size_t byte_col
     return false;
 }
 
+typedef enum {
+    ROW_STYLE_UNSET = -1,
+    ROW_STYLE_NORMAL,
+    ROW_STYLE_MATCH,
+    ROW_STYLE_SELECTION,
+} row_style_t;
+
+static void set_row_style(abuf_t *ab, const theme_t *theme, row_style_t *current, row_style_t wanted)
+{
+    if (wanted == *current) {
+        return;
+    }
+    abuf_append_str(ab, theme->reset);
+    switch (wanted) {
+    case ROW_STYLE_SELECTION:
+        abuf_append_str(ab, theme->selection);
+        break;
+    case ROW_STYLE_MATCH:
+        abuf_append_str(ab, theme->search_match);
+        break;
+    case ROW_STYLE_NORMAL:
+    default:
+        abuf_append_str(ab, theme->normal);
+        break;
+    }
+    *current = wanted;
+}
+
 static void render_text_row(abuf_t *ab, const editor_t *ed, size_t file_row)
 {
+    const theme_t *theme = ed->theme;
     const line_t *line = &ed->buf.lines[file_row];
     int text_cols = editor_text_cols(ed);
     size_t coloff = ed->coloff;
@@ -157,21 +197,16 @@ static void render_text_row(abuf_t *ab, const editor_t *ed, size_t file_row)
     size_t i = 0;
     size_t rx = 0;
     int emitted = 0;
-    bool hl_active = false;
-    bool match_active = false;
+    row_style_t style = ROW_STYLE_UNSET;
+    set_row_style(ab, theme, &style, ROW_STYLE_NORMAL);
 
     while (i < line->len && emitted < text_cols) {
         unsigned char c = (unsigned char)line->chars[i];
         bool should_hl = row_has_hl && i >= hl_start && i < hl_end;
         bool should_match = show_matches && byte_in_search_match(ed, file_row, i);
-        if (should_hl != hl_active) {
-            abuf_append_str(ab, should_hl ? "\x1b[7m" : "\x1b[27m");
-            hl_active = should_hl;
-        }
-        if (should_match != match_active) {
-            abuf_append_str(ab, should_match ? "\x1b[4m" : "\x1b[24m");
-            match_active = should_match;
-        }
+        row_style_t wanted =
+            should_hl ? ROW_STYLE_SELECTION : (should_match ? ROW_STYLE_MATCH : ROW_STYLE_NORMAL);
+        set_row_style(ab, theme, &style, wanted);
 
         if (c == '\t') {
             size_t width = DAF_TAB_STOP - (rx % DAF_TAB_STOP);
@@ -197,17 +232,12 @@ static void render_text_row(abuf_t *ab, const editor_t *ed, size_t file_row)
         }
     }
 
-    if (hl_active) {
-        abuf_append_str(ab, "\x1b[27m");
-    }
-    if (match_active) {
-        abuf_append_str(ab, "\x1b[24m");
-    }
+    set_row_style(ab, theme, &style, ROW_STYLE_NORMAL);
 }
 
 static void render_status_bar(abuf_t *ab, const editor_t *ed)
 {
-    abuf_append_str(ab, "\x1b[7m");
+    abuf_append_str(ab, ed->theme->status_bar);
 
     char left[256];
     const char *name = ed->buf.filename != NULL ? ed->buf.filename : "[No Name]";
@@ -238,12 +268,13 @@ static void render_status_bar(abuf_t *ab, const editor_t *ed)
         abuf_append(ab, right, (size_t)right_len);
     }
 
-    abuf_append_str(ab, "\x1b[0m");
+    abuf_append_str(ab, ed->theme->reset);
     abuf_append_str(ab, "\r\n");
 }
 
 static void render_message_bar(abuf_t *ab, const editor_t *ed)
 {
+    abuf_append_str(ab, ed->theme->normal);
     abuf_append_str(ab, "\x1b[K");
     if (ed->mode != MODE_EDIT) {
         abuf_append_str(ab, prompt_label(ed->mode));
@@ -266,6 +297,7 @@ static void render_message_bar(abuf_t *ab, const editor_t *ed)
         }
         abuf_append(ab, ed->status_msg, len);
     }
+    abuf_append_str(ab, ed->theme->reset);
 }
 
 void render_screen(editor_t *ed)
@@ -285,6 +317,7 @@ void render_screen(editor_t *ed)
             render_empty_gutter(&ab, ed);
         }
         abuf_append_str(&ab, "\x1b[K");
+        abuf_append_str(&ab, ed->theme->reset);
         abuf_append_str(&ab, "\r\n");
     }
 

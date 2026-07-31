@@ -3,6 +3,8 @@ daf_lib_sources = files(
   'terminal.c',
   'encoding.c',
   'filetype.c',
+  'theme.c',
+  'config.c',
   'buffer.c',
   'search.c',
   'render.c',
