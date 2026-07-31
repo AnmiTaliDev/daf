@@ -37,7 +37,7 @@ static const theme_t *resolve_theme(const char *cli_theme_name)
         name = theme_build_default_name();
     }
 
-    const theme_t *theme = theme_find(name);
+    const theme_t *theme = theme_load(name);
     if (theme == NULL) {
         fprintf(stderr, "daf: unknown theme \"%s\", falling back to \"dark\"\n", name);
         theme = theme_find("dark");
