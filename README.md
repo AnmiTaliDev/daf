@@ -19,6 +19,25 @@ want real colors). Resolved in this order:
 The config file's own location can be changed at build time too, with
 `meson configure -Dconfig_subpath=...`.
 
+### Custom themes
+
+Any `--theme=NAME` (or `DAF_THEME`, or config `theme=`) that isn't
+`dark`/`light`/`mono` is looked up as a file at
+`$XDG_CONFIG_HOME/daf/themes/NAME.conf` (or
+`~/.config/daf/themes/NAME.conf` — directory changeable at build time via
+`meson configure -Dtheme_dir_subpath=...`). It's `key=value` lines, each
+value a 256-color palette index as `fg` or `fg,bg`:
+
+```
+# ~/.config/daf/themes/mytheme.conf
+base=dark          # start from a built-in theme; defaults to dark
+selection=196,231   # override just the roles you want
+```
+
+Unset roles are inherited from `base`. Available roles: `normal`, `gutter`,
+`gutter_current` (the current line's line-number digit), `selection`,
+`search_match`, `status_bar`, `tilde`.
+
 ## Building
 
 Built with [Meson](https://mesonbuild.com/):

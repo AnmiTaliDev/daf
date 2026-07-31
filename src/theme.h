@@ -19,6 +19,10 @@ typedef struct {
 
 const theme_t *theme_find(const char *name);
 
+const theme_t *theme_load(const char *name);
+
 const char *theme_build_default_name(void);
+
+const char *theme_dir_subpath(void);
 
 #endif /* DAF_THEME_H */
