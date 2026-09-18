@@ -41,6 +41,7 @@ static void buffer_append_line(buffer_t *buf, const char *data, size_t len)
     buffer_ensure_line_cap(buf, buf->num_lines + 1);
     line_t *line = &buf->lines[buf->num_lines];
     line->chars = NULL;
+    line->cap = 0;
     line->len = 0;
     if (len > 0) {
         line_ensure_cap(line, len);
