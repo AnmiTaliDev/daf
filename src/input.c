@@ -134,6 +134,7 @@ static void confirm_prompt(editor_t *ed)
         if (ed->prompt_len > 0) {
             if (buffer_save_as(&ed->buf, ed->prompt_input) == 0) {
                 ed->filetype = filetype_detect(ed->buf.filename);
+                editor_setup_syntax(ed);
                 editor_set_status(ed, "Saved \"%s\"", ed->buf.filename);
             } else {
                 editor_set_status(ed, "Error: could not save \"%s\"", ed->prompt_input);

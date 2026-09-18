@@ -144,26 +144,54 @@ static bool byte_in_search_match(const editor_t *ed, size_t row, size_t byte_col
 }
 
 typedef enum {
-    ROW_STYLE_UNSET = -1,
-    ROW_STYLE_NORMAL,
-    ROW_STYLE_MATCH,
-    ROW_STYLE_SELECTION,
-} row_style_t;
+    STYLE_UNSET = -1,
+    STYLE_NORMAL,
+    STYLE_MATCH,
+    STYLE_SELECTION,
+    STYLE_KEYWORD,
+    STYLE_STRING,
+    STYLE_COMMENT,
+    STYLE_TYPE,
+    STYLE_FUNCTION,
+    STYLE_NUMBER,
+    STYLE_OPERATOR,
+} active_style_t;
 
-static void set_row_style(abuf_t *ab, const theme_t *theme, row_style_t *current, row_style_t wanted)
+static void set_row_style(abuf_t *ab, const theme_t *theme, active_style_t *current, active_style_t wanted)
 {
     if (wanted == *current) {
         return;
     }
     abuf_append_str(ab, theme->reset);
     switch (wanted) {
-    case ROW_STYLE_SELECTION:
+    case STYLE_SELECTION:
         abuf_append_str(ab, theme->selection);
         break;
-    case ROW_STYLE_MATCH:
+    case STYLE_MATCH:
         abuf_append_str(ab, theme->search_match);
         break;
-    case ROW_STYLE_NORMAL:
+    case STYLE_KEYWORD:
+        abuf_append_str(ab, theme->syntax_keyword);
+        break;
+    case STYLE_STRING:
+        abuf_append_str(ab, theme->syntax_string);
+        break;
+    case STYLE_COMMENT:
+        abuf_append_str(ab, theme->syntax_comment);
+        break;
+    case STYLE_TYPE:
+        abuf_append_str(ab, theme->syntax_type);
+        break;
+    case STYLE_FUNCTION:
+        abuf_append_str(ab, theme->syntax_function);
+        break;
+    case STYLE_NUMBER:
+        abuf_append_str(ab, theme->syntax_number);
+        break;
+    case STYLE_OPERATOR:
+        abuf_append_str(ab, theme->syntax_operator);
+        break;
+    case STYLE_NORMAL:
     default:
         abuf_append_str(ab, theme->normal);
         break;
@@ -194,18 +222,39 @@ static void render_text_row(abuf_t *ab, const editor_t *ed, size_t file_row)
                           ed->mode == MODE_PROMPT_REPLACE_WITH) &&
                          ed->search_match_count > 0;
 
+    uint8_t *syntax_roles = NULL;
+    if (line->len > 0) {
+        syntax_roles = xmalloc(line->len);
+        syntax_get_line_roles(ed->syntax, file_row, line, syntax_roles);
+    }
+
     size_t i = 0;
     size_t rx = 0;
     int emitted = 0;
-    row_style_t style = ROW_STYLE_UNSET;
-    set_row_style(ab, theme, &style, ROW_STYLE_NORMAL);
+    active_style_t style = STYLE_UNSET;
+    set_row_style(ab, theme, &style, STYLE_NORMAL);
 
     while (i < line->len && emitted < text_cols) {
         unsigned char c = (unsigned char)line->chars[i];
         bool should_hl = row_has_hl && i >= hl_start && i < hl_end;
         bool should_match = show_matches && byte_in_search_match(ed, file_row, i);
-        row_style_t wanted =
-            should_hl ? ROW_STYLE_SELECTION : (should_match ? ROW_STYLE_MATCH : ROW_STYLE_NORMAL);
+        active_style_t wanted = STYLE_NORMAL;
+        if (should_hl) {
+            wanted = STYLE_SELECTION;
+        } else if (should_match) {
+            wanted = STYLE_MATCH;
+        } else if (syntax_roles != NULL) {
+            switch (syntax_roles[i]) {
+            case SYNTAX_ROLE_KEYWORD: wanted = STYLE_KEYWORD; break;
+            case SYNTAX_ROLE_STRING: wanted = STYLE_STRING; break;
+            case SYNTAX_ROLE_COMMENT: wanted = STYLE_COMMENT; break;
+            case SYNTAX_ROLE_TYPE: wanted = STYLE_TYPE; break;
+            case SYNTAX_ROLE_FUNCTION: wanted = STYLE_FUNCTION; break;
+            case SYNTAX_ROLE_NUMBER: wanted = STYLE_NUMBER; break;
+            case SYNTAX_ROLE_OPERATOR: wanted = STYLE_OPERATOR; break;
+            default: wanted = STYLE_NORMAL; break;
+            }
+        }
         set_row_style(ab, theme, &style, wanted);
 
         if (c == '\t') {
@@ -232,7 +281,8 @@ static void render_text_row(abuf_t *ab, const editor_t *ed, size_t file_row)
         }
     }
 
-    set_row_style(ab, theme, &style, ROW_STYLE_NORMAL);
+    set_row_style(ab, theme, &style, STYLE_NORMAL);
+    free(syntax_roles);
 }
 
 static void render_status_bar(abuf_t *ab, const editor_t *ed)
@@ -302,6 +352,7 @@ static void render_message_bar(abuf_t *ab, const editor_t *ed)
 
 void render_screen(editor_t *ed)
 {
+    syntax_update(ed->syntax, &ed->buf);
     editor_scroll(ed);
 
     abuf_t ab = {0};

@@ -41,7 +41,6 @@ static void buffer_append_line(buffer_t *buf, const char *data, size_t len)
     buffer_ensure_line_cap(buf, buf->num_lines + 1);
     line_t *line = &buf->lines[buf->num_lines];
     line->chars = NULL;
-    line->cap = 0;
     line->len = 0;
     if (len > 0) {
         line_ensure_cap(line, len);
@@ -58,6 +57,7 @@ void buffer_init(buffer_t *buf)
     buf->cap_lines = 0;
     buf->filename = NULL;
     buf->dirty = 0;
+    buf->version = 0;
     buf->encoding = ENCODING_UTF8;
     buf->use_crlf = 0;
     buf->trailing_newline = 1;
@@ -117,6 +117,7 @@ int buffer_load(buffer_t *buf, const char *filename)
     buf->use_crlf = 0;
     buf->trailing_newline = 1;
     buf->dirty = 0;
+    buf->version = 0;
 
     size_t line_start = offset;
     int first_line = 1;
@@ -139,13 +140,13 @@ int buffer_load(buffer_t *buf, const char *filename)
         line_start = i + 1;
     }
 
-    if (line_start < total) {
-        buffer_append_line(buf, (const char *)data + line_start, total - line_start);
+    if (line_start < total || buf->num_lines == 0) {
+        size_t line_end = total;
+        if (line_end > line_start && data[line_end - 1] == '\r') {
+            line_end--;
+        }
+        buffer_append_line(buf, (const char *)data + line_start, line_end - line_start);
         buf->trailing_newline = 0;
-    }
-
-    if (buf->num_lines == 0) {
-        buffer_append_line(buf, "", 0);
     }
 
     free(data);
@@ -204,6 +205,7 @@ void buffer_insert_bytes(buffer_t *buf, size_t row, size_t col, const char *byte
     memcpy(line->chars + col, bytes, n);
     line->len += n;
     buf->dirty = 1;
+    buf->version++;
 }
 
 void buffer_delete_range(buffer_t *buf, size_t r1, size_t c1, size_t r2, size_t c2)
@@ -214,6 +216,7 @@ void buffer_delete_range(buffer_t *buf, size_t r1, size_t c1, size_t r2, size_t 
         memmove(line->chars + c1, line->chars + c1 + n, line->len - c1 - n);
         line->len -= n;
         buf->dirty = 1;
+        buf->version++;
         return;
     }
 
@@ -235,6 +238,7 @@ void buffer_delete_range(buffer_t *buf, size_t r1, size_t c1, size_t r2, size_t 
             (buf->num_lines - r2 - 1) * sizeof(line_t));
     buf->num_lines -= remove_count;
     buf->dirty = 1;
+    buf->version++;
 }
 
 void buffer_split_line(buffer_t *buf, size_t row, size_t col)
@@ -260,6 +264,7 @@ void buffer_split_line(buffer_t *buf, size_t row, size_t col)
 
     buf->num_lines += 1;
     buf->dirty = 1;
+    buf->version++;
 }
 
 void buffer_join_lines(buffer_t *buf, size_t row)
@@ -276,61 +281,78 @@ void buffer_join_lines(buffer_t *buf, size_t row)
             (buf->num_lines - row - 2) * sizeof(line_t));
     buf->num_lines -= 1;
     buf->dirty = 1;
+    buf->version++;
 }
 
 char *buffer_extract_text(const buffer_t *buf, size_t r1, size_t c1, size_t r2, size_t c2,
-                           size_t *out_len)
+                          size_t *out_len)
 {
     if (r1 == r2) {
         const line_t *line = &buf->lines[r1];
         size_t len = c2 - c1;
-        char *text = xmalloc(len > 0 ? len : 1);
+        char *text = xmalloc(len + 1);
         memcpy(text, line->chars + c1, len);
-        *out_len = len;
+        text[len] = '\0';
+        if (out_len != NULL) {
+            *out_len = len;
+        }
         return text;
     }
 
-    size_t total = (buf->lines[r1].len - c1) + 1;
-    for (size_t row = r1 + 1; row < r2; row++) {
-        total += buf->lines[row].len + 1;
+    size_t total = 0;
+    total += buf->lines[r1].len - c1 + 1;
+    for (size_t r = r1 + 1; r < r2; r++) {
+        total += buf->lines[r].len + 1;
     }
     total += c2;
 
-    char *text = xmalloc(total > 0 ? total : 1);
-    size_t pos = 0;
+    char *text = xmalloc(total + 1);
+    size_t offset = 0;
 
-    memcpy(text + pos, buf->lines[r1].chars + c1, buf->lines[r1].len - c1);
-    pos += buf->lines[r1].len - c1;
-    text[pos++] = '\n';
+    size_t first_len = buf->lines[r1].len - c1;
+    memcpy(text + offset, buf->lines[r1].chars + c1, first_len);
+    offset += first_len;
+    text[offset++] = '\n';
 
-    for (size_t row = r1 + 1; row < r2; row++) {
-        memcpy(text + pos, buf->lines[row].chars, buf->lines[row].len);
-        pos += buf->lines[row].len;
-        text[pos++] = '\n';
+    for (size_t r = r1 + 1; r < r2; r++) {
+        size_t len = buf->lines[r].len;
+        memcpy(text + offset, buf->lines[r].chars, len);
+        offset += len;
+        text[offset++] = '\n';
     }
 
-    memcpy(text + pos, buf->lines[r2].chars, c2);
-    pos += c2;
+    memcpy(text + offset, buf->lines[r2].chars, c2);
+    offset += c2;
+    text[offset] = '\0';
 
-    *out_len = pos;
+    if (out_len != NULL) {
+        *out_len = offset;
+    }
     return text;
 }
 
 void buffer_insert_text(buffer_t *buf, size_t row, size_t col, const char *text, size_t len)
 {
-    size_t start = 0;
-    for (size_t i = 0; i < len; i++) {
-        if (text[i] != '\n') {
-            continue;
+    size_t cur_row = row;
+    size_t cur_col = col;
+    size_t seg_start = 0;
+
+    for (size_t i = 0; i <= len; i++) {
+        if (i == len || text[i] == '\n') {
+            size_t seg_len = i - seg_start;
+            if (seg_len > 0 && text[i - 1] == '\r') {
+                seg_len--;
+            }
+            if (seg_len > 0) {
+                buffer_insert_bytes(buf, cur_row, cur_col, text + seg_start, seg_len);
+                cur_col += seg_len;
+            }
+            if (i < len && text[i] == '\n') {
+                buffer_split_line(buf, cur_row, cur_col);
+                cur_row++;
+                cur_col = 0;
+            }
+            seg_start = i + 1;
         }
-        buffer_insert_bytes(buf, row, col, text + start, i - start);
-        col += i - start;
-        buffer_split_line(buf, row, col);
-        row += 1;
-        col = 0;
-        start = i + 1;
-    }
-    if (start < len) {
-        buffer_insert_bytes(buf, row, col, text + start, len - start);
     }
 }

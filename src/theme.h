@@ -15,6 +15,13 @@ typedef struct {
     const char *status_bar;
     const char *tilde;
     const char *reset;
+    const char *syntax_keyword;
+    const char *syntax_string;
+    const char *syntax_comment;
+    const char *syntax_type;
+    const char *syntax_function;
+    const char *syntax_number;
+    const char *syntax_operator;
 } theme_t;
 
 const theme_t *theme_find(const char *name);
