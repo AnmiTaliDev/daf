@@ -28,6 +28,13 @@ static const theme_t k_theme_dark = {
     .status_bar = "\x1b[38;5;234;48;5;250m",
     .tilde = "\x1b[38;5;238;48;5;234m",
     .reset = "\x1b[0m",
+    .syntax_keyword = "\x1b[38;5;204;48;5;234m",
+    .syntax_string = "\x1b[38;5;114;48;5;234m",
+    .syntax_comment = "\x1b[38;5;244;48;5;234m",
+    .syntax_type = "\x1b[38;5;75;48;5;234m",
+    .syntax_function = "\x1b[38;5;186;48;5;234m",
+    .syntax_number = "\x1b[38;5;173;48;5;234m",
+    .syntax_operator = "\x1b[38;5;250;48;5;234m",
 };
 
 static const theme_t k_theme_light = {
@@ -40,6 +47,13 @@ static const theme_t k_theme_light = {
     .status_bar = "\x1b[38;5;255;48;5;60m",
     .tilde = "\x1b[38;5;250;48;5;255m",
     .reset = "\x1b[0m",
+    .syntax_keyword = "\x1b[38;5;161;48;5;255m",
+    .syntax_string = "\x1b[38;5;28;48;5;255m",
+    .syntax_comment = "\x1b[38;5;245;48;5;255m",
+    .syntax_type = "\x1b[38;5;25;48;5;255m",
+    .syntax_function = "\x1b[38;5;94;48;5;255m",
+    .syntax_number = "\x1b[38;5;166;48;5;255m",
+    .syntax_operator = "\x1b[38;5;240;48;5;255m",
 };
 
 static const theme_t k_theme_mono = {
@@ -52,6 +66,13 @@ static const theme_t k_theme_mono = {
     .status_bar = "\x1b[7m",
     .tilde = "",
     .reset = "\x1b[0m",
+    .syntax_keyword = "",
+    .syntax_string = "",
+    .syntax_comment = "",
+    .syntax_type = "",
+    .syntax_function = "",
+    .syntax_number = "",
+    .syntax_operator = "",
 };
 
 const theme_t *theme_find(const char *name)
@@ -142,6 +163,20 @@ static void apply_role(theme_t *custom, const char *key, char *sgr)
         custom->status_bar = sgr;
     } else if (strcmp(key, "tilde") == 0) {
         custom->tilde = sgr;
+    } else if (strcmp(key, "keyword") == 0) {
+        custom->syntax_keyword = sgr;
+    } else if (strcmp(key, "string") == 0) {
+        custom->syntax_string = sgr;
+    } else if (strcmp(key, "comment") == 0) {
+        custom->syntax_comment = sgr;
+    } else if (strcmp(key, "type") == 0) {
+        custom->syntax_type = sgr;
+    } else if (strcmp(key, "function") == 0) {
+        custom->syntax_function = sgr;
+    } else if (strcmp(key, "number") == 0) {
+        custom->syntax_number = sgr;
+    } else if (strcmp(key, "operator") == 0) {
+        custom->syntax_operator = sgr;
     } else {
         free(sgr);
     }

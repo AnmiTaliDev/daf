@@ -224,7 +224,21 @@ void editor_free(editor_t *ed)
     free(ed->redo_stack);
     free(ed->clipboard);
     free(ed->search_matches);
+    syntax_destroy(ed->syntax);
+    ed->syntax = NULL;
     buffer_free(&ed->buf);
+}
+
+void editor_setup_syntax(editor_t *ed)
+{
+    if (ed->syntax != NULL) {
+        syntax_destroy(ed->syntax);
+        ed->syntax = NULL;
+    }
+    ed->syntax = syntax_create(ed->filetype);
+    if (ed->syntax != NULL) {
+        syntax_update(ed->syntax, &ed->buf);
+    }
 }
 
 void editor_open(editor_t *ed, const char *filename)
@@ -237,6 +251,7 @@ void editor_open(editor_t *ed, const char *filename)
         editor_set_status(ed, "New file \"%s\"", filename);
     }
     ed->filetype = filetype_detect(filename);
+    editor_setup_syntax(ed);
     ed->cy = 0;
     ed->cx = 0;
     ed->rowoff = 0;

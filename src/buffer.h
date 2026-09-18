@@ -21,6 +21,7 @@ typedef struct {
     size_t cap_lines;
     char *filename;
     int dirty;
+    size_t version;
     encoding_t encoding;
     int use_crlf;
     int trailing_newline;
@@ -41,7 +42,7 @@ void buffer_split_line(buffer_t *buf, size_t row, size_t col);
 void buffer_join_lines(buffer_t *buf, size_t row);
 
 char *buffer_extract_text(const buffer_t *buf, size_t r1, size_t c1, size_t r2, size_t c2,
-                           size_t *out_len);
+                          size_t *out_len);
 
 void buffer_insert_text(buffer_t *buf, size_t row, size_t col, const char *text, size_t len);
 

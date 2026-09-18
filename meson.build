@@ -18,5 +18,9 @@ add_project_arguments(
   language: 'c',
 )
 
+tree_sitter_dep = dependency('tree-sitter')
+cc = meson.get_compiler('c')
+dl_dep = cc.find_library('dl', required: false)
+
 subdir('src')
 subdir('tests')

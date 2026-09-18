@@ -10,6 +10,7 @@
 
 #include "buffer.h"
 #include "search.h"
+#include "syntax.h"
 #include "theme.h"
 
 typedef enum {
@@ -63,6 +64,7 @@ typedef struct {
     char status_msg[256];
     const char *filetype;
     const theme_t *theme;
+    syntax_highlighter_t *syntax;
 
     edit_record_t *undo_stack;
     size_t undo_count;
@@ -81,6 +83,7 @@ typedef struct {
 void editor_init(editor_t *ed, int screen_rows, int screen_cols);
 void editor_free(editor_t *ed);
 void editor_open(editor_t *ed, const char *filename);
+void editor_setup_syntax(editor_t *ed);
 void editor_update_screen_size(editor_t *ed, int screen_rows, int screen_cols);
 
 void editor_set_status(editor_t *ed, const char *fmt, ...);
